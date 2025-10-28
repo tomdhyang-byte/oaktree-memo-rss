@@ -301,7 +301,10 @@ function buildRSS(items) {
           title: it.title,
           link: it.link,
           guid: it.link,
-          pubDate: it.pubDate,
+          pubDate: (!it.pubDate || String(it.pubDate).toLowerCase().includes('invalid'))
+            ? new Date().toUTCString()
+            : it.pubDate,
+
           description: it.description ? `<![CDATA[${it.description.replace(/]]>/g, ']]]]><![CDATA[>')}]]>` : undefined,
           'content:encoded': `<![CDATA[${it.fullHTML.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`,
           enclosure: it.enclosure ? { '@url': it.enclosure, '@type': 'application/pdf' } : undefined
