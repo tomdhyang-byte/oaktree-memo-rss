@@ -9,9 +9,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.56.1-jammy  # ✅ 與套件版本一致
+      image: mcr.microsoft.com/playwright:v1.56.1-jammy
+
     permissions:
       contents: write
+
+    defaults:
+      run:
+        working-directory: /__w/oaktree-memo-rss/oaktree-memo-rss  # ✅ Git repo 正確位置
 
     steps:
       - name: Checkout
@@ -23,10 +28,11 @@ jobs:
       - name: Build feed
         run: node scripts/scrape.mjs
 
-      - name: Commit & push
+      - name: Commit & push feed.xml
         run: |
+          git config --global --add safe.directory $(pwd)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add docs/feed.xml
           git commit -m "chore: update feed.xml" || echo "No changes"
           git push
