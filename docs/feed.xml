@@ -1,1 +1,48 @@
-<!-- First run will generate real RSS here -->
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Oaktree Howard Marks Memos (Unofficial)</title>
+    <link>https://www.oaktreecapital.com/insights/memo/</link>
+    <description>Auto-generated RSS feed for Howard Marks memos from Oaktree Capital.</description>
+    <language>en</language>
+    <lastBuildDate>Tue, 28 Oct 2025 09:22:43 GMT</lastBuildDate>
+    <atom:link href="REPLACE_WITH_YOUR_PAGES_URL/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>The Best of . . .</title>
+      <link>https://www.oaktreecapital.com/insights/memo/the-best-of</link>
+      <guid>https://www.oaktreecapital.com/insights/memo/the-best-of</guid>
+      <pubDate>Invalid Date</pubDate>
+      <enclosure url="https://www.oaktreecapital.comjavascript:openPDF('The Best of. . .','https://www.oaktreecapital.com/docs/default-source/memos/the-best-of.pdf?sfvrsn=e40a2966_4')" type="application/pdf"/>
+    </item>
+    <item>
+      <title>The Calculus of Value</title>
+      <link>https://www.oaktreecapital.com/insights/memo/the-calculus-of-value</link>
+      <guid>https://www.oaktreecapital.com/insights/memo/the-calculus-of-value</guid>
+      <pubDate>Invalid Date</pubDate>
+      <description>&lt;![CDATA[On July 28, I flew to South America on a plane without Wi-Fi, leaving me without email or entertainment.  What was I to do but start in on a memo?  Interestingly, the things I wrote during that flight turned out to be the answers to many of the questions I received from clients after I landed, so writing what follows served me well.  I hope it’ll do the same for you.
+
+*            *            *
+
+January 2 of this year was the 25th anniversary of my memo bubble.com, the one that put my writing on the map, and I marked the occasion by publishing another memo, called On Bubble Watch. While the title may have raised concern for readers, my main conclusion was that the elevated U.S. stock market valuations at the time didn’t necessarily signal the existence of a bubble, mainly because I didn’t detect the extreme investor psychology I associate with bubbles.  Security prices were “lofty but not nutty” is how I put it.  Because a lot has taken place in the seven months since then, it’s time for an update on asset values.
+
+Before I start, please note that I’m talking about investing in general.  My specific reference will be to public U.S. corporate securities – stocks and bonds – since they mark to market regularly and are the assets that most enter my consciousness.  But since investors’ actions toward one group of assets and the resulting price movements influence other assets and other markets – and since they ensue largely from investor psychology, which is highly contagious – I think my comments are probably applicable to other asset classes, to private assets as well as public ones, and possibly to markets outside the U.S.
+
+I’ll start by laying out where I think investment value comes from and how it should be assessed.  I don’t think I’ve ever done this before in this form.  It’s a big topic, but I’ll try to cover it briefly.]]&gt;</description>
+      <enclosure url="https://www.oaktreecapital.comjavascript:openPDF('The Calculus of Value_JPN','https://www.oaktreecapital.com/docs/default-source/memos/translated-memos/the-calculus-of-value_jpn.pdf?sfvrsn=a1a32966_1')" type="application/pdf"/>
+    </item>
+    <item>
+      <title>More on Repealing the Laws of Economics</title>
+      <link>https://www.oaktreecapital.com/insights/memo/more-on-repealing-the-laws-of-economics</link>
+      <guid>https://www.oaktreecapital.com/insights/memo/more-on-repealing-the-laws-of-economics</guid>
+      <pubDate>Invalid Date</pubDate>
+      <enclosure url="https://www.oaktreecapital.comjavascript:openPDF('More on Repealing the Laws of Economics_JPN','https://www.oaktreecapital.com/docs/default-source/memos/translated-memos/more-on-repealing-the-laws-of-economics_jpn.pdf?sfvrsn=a162a66_1')" type="application/pdf"/>
+    </item>
+    <item>
+      <title>Nobody Knows (Yet Again)</title>
+      <link>https://www.oaktreecapital.com/insights/memo/nobody-knows-yet-again</link>
+      <guid>https://www.oaktreecapital.com/insights/memo/nobody-knows-yet-again</guid>
+      <pubDate>Invalid Date</pubDate>
+      <enclosure url="https://www.oaktreecapital.comjavascript:openPDF('Nobody Knows (Yet Again)_JPN','https://www.oaktreecapital.com/docs/default-source/memos/translated-memos/nobody-knows-(yet-again)_jpn.pdf?sfvrsn=804e2b66_1')" type="application/pdf"/>
+    </item>
+  </channel>
+</rss>
