@@ -39,28 +39,34 @@ function absolutize(url) {
   return url;
 }
 
-/* -------------------- NEW: helpers for dates & cleaning -------------------- */
+/* ---------- helpers: dates, pdf, cleaning ---------- */
 function parseDateOrNull(str) {
   if (!str) return null;
   const d = new Date(str);
   return isNaN(d.getTime()) ? null : d.toUTCString();
 }
 
-// fallback: scan visible text like "Oct 12, 2025"
-function tryExtractFallbackDate(dom) {
-  const txt = dom.text || '';
-  const m = txt.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+\d{4}\b/i);
+function tryExtractFallbackDateFromText(text) {
+  if (!text) return null;
+  const m = text.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+\d{4}\b/i);
   if (!m) return null;
   const d = new Date(m[0]);
   return isNaN(d.getTime()) ? null : d.toUTCString();
 }
 
-function extractDate(dom) {
-  const t = dom.querySelector('time[datetime]')?.getAttribute('datetime')
-        || dom.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
-        || dom.querySelector('meta[name="date"]')?.getAttribute('content')
-        || null;
-  return parseDateOrNull(t);
+function extractDate(dom, htmlText) {
+  const meta =
+    dom.querySelector('time[datetime]')?.getAttribute('datetime') ||
+    dom.querySelector('meta[property="article:published_time"]')?.getAttribute('content') ||
+    dom.querySelector('meta[name="date"]')?.getAttribute('content') ||
+    null;
+
+  return (
+    parseDateOrNull(meta) ||
+    tryExtractFallbackDateFromText(dom.text) ||
+    tryExtractFallbackDateFromText(htmlText) ||
+    null
+  );
 }
 
 // javascript:openPDF('Title','https://...pdf?...') -> extract true URL
@@ -70,28 +76,27 @@ function extractPdfFromJsHref(href) {
   return m && m[2] ? m[2] : null;
 }
 
-// normalize all anchors in root: fix openPDF, absolutize, drop empty
+// normalize anchors: fix openPDF & absolutize & standard attrs
 function normalizeAnchors(root) {
   root.querySelectorAll('a').forEach(a => {
     const raw = a.getAttribute('href') || a.getAttribute('data-href') || a.getAttribute('data-file');
     let href = raw || '';
     if (href.startsWith('javascript:openPDF')) {
       const pdf = extractPdfFromJsHref(href);
-      if (pdf) href = pdf; else href = '';
+      href = pdf || '';
     }
     href = absolutize(href);
     if (!href) a.removeAttribute('href'); else a.setAttribute('href', href);
-    // standard target/rel
     a.setAttribute('target', '_blank');
     a.setAttribute('rel', 'noopener noreferrer');
   });
 }
 
-// strip boilerplate blocks like "Related Content", "Share", "Load More", "PDF Translations", "Subscribe", "Archived Memos"
+// remove boilerplate blocks by text cues
 function stripBoilerplate(root) {
   const killIfMatch = (selector, patterns) => {
     root.querySelectorAll(selector).forEach(el => {
-      const t = (el.innerText || el.text || '').toLowerCase();
+      const t = (el.text || el.rawText || '').toLowerCase();
       if (patterns.some(p => t.includes(p))) el.remove();
     });
   };
@@ -101,7 +106,36 @@ function stripBoilerplate(root) {
   ]);
 }
 
-/* ------------------------------------------------------------------------- */
+// extra safety: also cleanse remaining "javascript:openPDF(...)" in final HTML string
+function fixOpenPDFInHTML(html) {
+  if (!html) return html;
+  // href="javascript:openPDF('...','URL.pdf?...')"
+  html = html.replace(
+    /href\s*=\s*"(?:javascript:)?openPDF\([^,]+,\s*'(https?:[^'"]+?\.pdf[^'"]*)'\)"/gi,
+    'href="$1"'
+  );
+  html = html.replace(
+    /href\s*=\s*'(?:javascript:)?openPDF\([^,]+,\s*"(https?:[^'"]+?\.pdf[^'"]*)"\)'/gi,
+    "href=\"$1\""
+  );
+  return html;
+}
+
+// light HTML string cleanup for obvious blocks that sometimes slip through
+function stripBoilerplateInHTML(html) {
+  if (!html) return html;
+  // remove "PDF Translations ... </ul>" block
+  html = html.replace(/PDF\s+Translations[\s\S]*?<ul>[\s\S]*?<\/ul>/gi, '');
+  // remove "Related Content ... (until next h2 or end)"
+  html = html.replace(/<h2[^>]*>\s*Related\s+Content[\s\S]*/gi, '');
+  // remove "Share ... Load More ..." sections
+  html = html.replace(/<ul>[\s\S]*?(twitter|linkedin|facebook)[\s\S]*?<\/ul>/gi, '');
+  html = html.replace(/Load More/gi, '');
+  html = html.replace(/Subscribe/gi, '');
+  html = html.replace(/Archived Memos/gi, '');
+  return html;
+}
+/* --------------------------------------------------- */
 
 async function getMemoLinks(page) {
   console.log('[info] navigating to list:', LIST_URL);
@@ -145,17 +179,26 @@ function sanitizeHTML(html) {
 }
 
 function findPdfUrl(dom) {
+  // direct links
   let el = dom.querySelector('a[href$=".pdf"], a[href*=".pdf?"], a[data-file$=".pdf"], a[data-href$=".pdf"]');
   if (el) {
     const href = el.getAttribute('href') || el.getAttribute('data-file') || el.getAttribute('data-href');
-    if (href) return absolutize(href);
+    if (href) {
+      if (href.startsWith('javascript:openPDF')) {
+        const pdf = extractPdfFromJsHref(href);
+        if (pdf) return absolutize(pdf);
+      }
+      return absolutize(href);
+    }
   }
-  const anyA = dom.querySelector('a[href^="javascript:openPDF"], a[onclick*="openPDF"], button[onclick*="openPDF"]');
-  const candidate = anyA?.getAttribute('href') || anyA?.getAttribute('onclick');
+  // javascript:openPDF on any clickable
+  const any = dom.querySelector('a[href^="javascript:openPDF"], a[onclick*="openPDF"], button[onclick*="openPDF"]');
+  const candidate = any?.getAttribute('href') || any?.getAttribute('onclick');
   if (candidate) {
-    const m = candidate.match(/openPDF\((?:'|")(.*?)(?:'|"),\s*(?:'|")(https?:[^'"]+?\.pdf[^'"]*)(?:'|")\)/i);
-    if (m && m[2]) return absolutize(m[2]);
+    const pdf = extractPdfFromJsHref(candidate);
+    if (pdf) return absolutize(pdf);
   }
+  // link tag
   const linkAlt = dom.querySelector('link[type="application/pdf"]')?.getAttribute('href');
   if (linkAlt) return absolutize(linkAlt);
   return null;
@@ -191,29 +234,51 @@ async function extractArticle(page, url) {
   const title = dom.querySelector('h1')?.text?.trim()
             || dom.querySelector('meta[property="og:title"]')?.getAttribute('content')
             || '';
-  // robust pubDate
-  const pubDate = extractDate(dom) || tryExtractFallbackDate(dom) || new Date().toUTCString();
 
+  // robust pubDate (meta -> text in DOM -> text in HTML -> now)
+  const pubDate = extractDate(dom, html) || new Date().toUTCString();
+
+  // get PDF url
   let pdf = findPdfUrl(dom);
 
   // pick + clean root
   const root = pickContentRoot(dom);
-  normalizeAnchors(root);          // fix javascript:openPDF & absolutize
-  stripBoilerplate(root);          // drop Related/Share/etc.
+  normalizeAnchors(root);
+  stripBoilerplate(root);
 
   const firstP = root.querySelector('p')?.text?.trim() || '';
   const short = firstP.length > 240 ? firstP.slice(0, 237) + '...' : firstP;
 
   let fullHTML = sanitizeHTML(root.toString());
-  // if html is still thin, fallback to PDF fulltext
-  if (fullHTML.replace(/<[^>]+>/g, '').trim().length < 600 && pdf) {
+
+  // fallback to PDF fulltext when HTML still too short
+  const plainLen = fullHTML.replace(/<[^>]+>/g, '').trim().length;
+  if (plainLen < 600 && pdf) {
     const pdfHTML = await fetchPDFtoHTML(pdf);
     if (pdfHTML) fullHTML = sanitizeHTML(pdfHTML);
   }
 
-  if (pdf) fullHTML += `<p><a href="${pdf}" target="_blank" rel="noopener">Download PDF</a></p>`;
+  // extra sweep on final HTML string
+  fullHTML = stripBoilerplateInHTML(fullHTML);
+  fullHTML = fixOpenPDFInHTML(fullHTML);
 
-  return { title, link: url, pubDate, description: short, fullHTML, enclosure: pdf || null };
+  // ensure enclosure uses true PDF URL
+  let enclosure = null;
+  if (pdf) {
+    if (pdf.startsWith('javascript:openPDF')) {
+      const fixed = extractPdfFromJsHref(pdf);
+      enclosure = fixed ? absolutize(fixed) : null;
+    } else {
+      enclosure = pdf;
+    }
+  }
+
+  // also append a clear PDF link if available
+  if (enclosure) {
+    fullHTML += `<p><a href="${enclosure}" target="_blank" rel="noopener">Download PDF</a></p>`;
+  }
+
+  return { title, link: url, pubDate, description: short, fullHTML, enclosure };
 }
 
 function buildRSS(items) {
