@@ -1,4 +1,3 @@
-
 import { chromium } from 'playwright';
 import { create } from 'xmlbuilder2';
 import { parse } from 'node-html-parser';
@@ -40,6 +39,70 @@ function absolutize(url) {
   return url;
 }
 
+/* -------------------- NEW: helpers for dates & cleaning -------------------- */
+function parseDateOrNull(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d.toUTCString();
+}
+
+// fallback: scan visible text like "Oct 12, 2025"
+function tryExtractFallbackDate(dom) {
+  const txt = dom.text || '';
+  const m = txt.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},\s+\d{4}\b/i);
+  if (!m) return null;
+  const d = new Date(m[0]);
+  return isNaN(d.getTime()) ? null : d.toUTCString();
+}
+
+function extractDate(dom) {
+  const t = dom.querySelector('time[datetime]')?.getAttribute('datetime')
+        || dom.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
+        || dom.querySelector('meta[name="date"]')?.getAttribute('content')
+        || null;
+  return parseDateOrNull(t);
+}
+
+// javascript:openPDF('Title','https://...pdf?...') -> extract true URL
+function extractPdfFromJsHref(href) {
+  if (!href) return null;
+  const m = href.match(/openPDF\((?:'|")(.*?)(?:'|"),\s*(?:'|")(https?:[^'"]+?\.pdf[^'"]*)(?:'|")\)/i);
+  return m && m[2] ? m[2] : null;
+}
+
+// normalize all anchors in root: fix openPDF, absolutize, drop empty
+function normalizeAnchors(root) {
+  root.querySelectorAll('a').forEach(a => {
+    const raw = a.getAttribute('href') || a.getAttribute('data-href') || a.getAttribute('data-file');
+    let href = raw || '';
+    if (href.startsWith('javascript:openPDF')) {
+      const pdf = extractPdfFromJsHref(href);
+      if (pdf) href = pdf; else href = '';
+    }
+    href = absolutize(href);
+    if (!href) a.removeAttribute('href'); else a.setAttribute('href', href);
+    // standard target/rel
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+  });
+}
+
+// strip boilerplate blocks like "Related Content", "Share", "Load More", "PDF Translations", "Subscribe", "Archived Memos"
+function stripBoilerplate(root) {
+  const killIfMatch = (selector, patterns) => {
+    root.querySelectorAll(selector).forEach(el => {
+      const t = (el.innerText || el.text || '').toLowerCase();
+      if (patterns.some(p => t.includes(p))) el.remove();
+    });
+  };
+  killIfMatch('*', [
+    'related content', 'share', 'load more',
+    'pdf translations', 'subscribe', 'archived memos'
+  ]);
+}
+
+/* ------------------------------------------------------------------------- */
+
 async function getMemoLinks(page) {
   console.log('[info] navigating to list:', LIST_URL);
   await page.goto(LIST_URL, { waitUntil: 'networkidle' });
@@ -51,14 +114,6 @@ async function getMemoLinks(page) {
   const filtered = links.filter(u => (/\/insights\/memo\/.+/.test(u)));
   console.log('[info] memo links found:', filtered.length);
   return filtered;
-}
-
-function extractDate(dom) {
-  const t = dom.querySelector('time[datetime]')?.getAttribute('datetime')
-        || dom.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
-        || dom.querySelector('meta[name="date"]')?.getAttribute('content')
-        || null;
-  return t ? new Date(t).toUTCString() : new Date().toUTCString();
 }
 
 function pickContentRoot(dom) {
@@ -98,7 +153,7 @@ function findPdfUrl(dom) {
   const anyA = dom.querySelector('a[href^="javascript:openPDF"], a[onclick*="openPDF"], button[onclick*="openPDF"]');
   const candidate = anyA?.getAttribute('href') || anyA?.getAttribute('onclick');
   if (candidate) {
-    const m = candidate.match(/openPDF\((?:'|\")(.*?)(?:'|\"),\s*(?:'|\")(https?:[^'\"]+?\.pdf[^'\"]*)(?:'|\")\)/i);
+    const m = candidate.match(/openPDF\((?:'|")(.*?)(?:'|"),\s*(?:'|")(https?:[^'"]+?\.pdf[^'"]*)(?:'|")\)/i);
     if (m && m[2]) return absolutize(m[2]);
   }
   const linkAlt = dom.querySelector('link[type="application/pdf"]')?.getAttribute('href');
@@ -136,16 +191,21 @@ async function extractArticle(page, url) {
   const title = dom.querySelector('h1')?.text?.trim()
             || dom.querySelector('meta[property="og:title"]')?.getAttribute('content')
             || '';
-  const pubDate = extractDate(dom);
+  // robust pubDate
+  const pubDate = extractDate(dom) || tryExtractFallbackDate(dom) || new Date().toUTCString();
 
   let pdf = findPdfUrl(dom);
+
+  // pick + clean root
   const root = pickContentRoot(dom);
-  root.querySelectorAll('a').forEach(a => a.setAttribute('href', absolutize(a.getAttribute('href'))));
+  normalizeAnchors(root);          // fix javascript:openPDF & absolutize
+  stripBoilerplate(root);          // drop Related/Share/etc.
 
   const firstP = root.querySelector('p')?.text?.trim() || '';
   const short = firstP.length > 240 ? firstP.slice(0, 237) + '...' : firstP;
 
   let fullHTML = sanitizeHTML(root.toString());
+  // if html is still thin, fallback to PDF fulltext
   if (fullHTML.replace(/<[^>]+>/g, '').trim().length < 600 && pdf) {
     const pdfHTML = await fetchPDFtoHTML(pdf);
     if (pdfHTML) fullHTML = sanitizeHTML(pdfHTML);
@@ -153,7 +213,7 @@ async function extractArticle(page, url) {
 
   if (pdf) fullHTML += `<p><a href="${pdf}" target="_blank" rel="noopener">Download PDF</a></p>`;
 
-  return { title, link: url, pubDate, description: short, fullHTML, enclosure: pdf };
+  return { title, link: url, pubDate, description: short, fullHTML, enclosure: pdf || null };
 }
 
 function buildRSS(items) {
