@@ -3,12 +3,12 @@ name: Generate RSS
 
 on:
   schedule:
-    - cron: '0 21 * * *'  # daily 21:00 UTC
+    - cron: '0 21 * * *'
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
 
@@ -21,18 +21,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Playwright browsers
-        uses: microsoft/playwright-github-action@v1
-
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Build feed (with verbose logging)
-        run: node scripts/scrape.mjs
-        env:
-          NODE_OPTIONS: --trace-warnings
+      - name: Install Playwright browsers
+        uses: microsoft/playwright-github-action@v1
 
-      - name: Commit & push feed
+      - name: Build feed
+        run: node scripts/scrape.mjs
+
+      - name: Commit & push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
