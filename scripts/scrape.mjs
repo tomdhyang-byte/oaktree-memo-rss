@@ -236,7 +236,10 @@ async function extractArticle(page, url) {
             || '';
 
   // robust pubDate (meta -> text in DOM -> text in HTML -> now)
-  const pubDate = extractDate(dom, html) || new Date().toUTCString();
+let pubDate = extractDate(dom, html) || new Date().toUTCString();
+if (!pubDate || String(pubDate).toLowerCase().includes('invalid')) {
+  pubDate = new Date().toUTCString();
+}
 
   // get PDF url
   let pdf = findPdfUrl(dom);
