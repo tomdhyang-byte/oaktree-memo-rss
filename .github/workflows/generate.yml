@@ -24,10 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Install Playwright browsers
-        uses: microsoft/playwright-github-action@v1
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install chromium
 
       - name: Build feed
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: 0
         run: node scripts/scrape.mjs
 
       - name: Commit & push
