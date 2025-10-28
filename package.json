@@ -1,0 +1,16 @@
+{
+  "name": "oaktree-memo-rss",
+  "version": "1.0.0",
+  "description": "Generate an RSS feed for Oaktree Capital Howard Marks Memos using Playwright + GitHub Actions.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/scrape.mjs",
+    "postinstall": "npx playwright install --with-deps"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0",
+    "xmlbuilder2": "^3.1.1",
+    "node-html-parser": "^6.1.13",
+    "dayjs": "^1.11.13"
+  }
+}
